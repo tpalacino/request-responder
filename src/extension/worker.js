@@ -6,6 +6,7 @@ chrome.runtime.onMessage.addListener((msg, _, sendResponse) => {
                 console.error("Failed to reload dynamic rules:", err);
                 sendResponse({ ok: false, error: err });
             });
+        return true;
     }
 });
 
