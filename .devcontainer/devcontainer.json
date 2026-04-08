@@ -1,0 +1,16 @@
+{
+	"name": "Request Responder",
+    "dockerComposeFile": "./docker-compose.yml",
+	"service": "request-responder",
+    "remoteUser": "root",
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "editorconfig.editorconfig"
+            ]
+        }
+    }
+}

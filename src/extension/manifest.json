@@ -1,0 +1,20 @@
+{
+    "manifest_version": 3,
+    "name": "Request Responder",
+    "version": "1.0",
+    "description": "Define rules for responding to requests.",
+    "icons": {
+        "1024": "logo.png"
+    },
+    "permissions": [
+        "storage",
+        "declarativeNetRequest"
+    ],
+    "host_permissions": [
+        "*://*/*"
+    ],
+    "background": {
+        "service_worker": "worker.js"
+    },
+    "options_page": "index.html"
+}

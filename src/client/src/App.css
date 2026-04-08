@@ -1,0 +1,25 @@
+.row {
+    display: flex;
+    flex-direction: row;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+}
+
+.row, .column {
+    gap: 1rem;
+}
+
+.padded {
+    padding: 1rem;
+}
+
+.center {
+    align-items: center;
+}
+
+.grow {
+    flex-grow: 1;
+}

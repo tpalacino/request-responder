@@ -1,0 +1,30 @@
+{
+  "name": "request-responder",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "workspaces": [
+    "src/client",
+    "src/extension",
+    "src/server"
+  ],
+  "type": "module",
+  "scripts": {
+    "start:client": "npm run dev -w @request-responder/client",
+    "start:server": "npm run dev -w @request-responder/server",
+    "start": "concurrently -n \"client,server\" -c blue,green \"npm run start:client\" \"npm run start:server\"",
+    "build:client": "npm run build -w @request-responder/client",
+    "build:extension": "npm run build -w @request-responder/extension",
+    "build:server": "npm run build -w @request-responder/server",
+    "build": "npm run build:client && npm run build:extension && npm run build:server",
+    "package:client": "cp -r ./src/client/dist/* ./dist/",
+    "package:extension": "cp -r ./src/extension/dist/* ./dist/",
+    "package:server": "cp -r ./src/server/dist/server.zip ./dist/",
+    "prepackage": "npm run build && rm -rf ./dist && mkdir ./dist",
+    "package": "npm run package:client && npm run package:extension && npm run package:server",
+    "postpackage": "cd ./dist && zip -r ../request-responder-solution.zip ./*"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

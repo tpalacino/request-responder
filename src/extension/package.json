@@ -1,0 +1,13 @@
+{
+  "name": "@request-responder/extension",
+  "version": "1.0.0",
+  "description": "",
+  "main": "worker.js",
+  "scripts": {
+    "build": "rm -rf ./dist && mkdir ./dist && cp logo.png manifest.json worker.js ./dist"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
