@@ -153,6 +153,8 @@ export default function App() {
     }),
   ];
 
+  const ruleFormRule = editRule || (showNewRule ? { id: "", name: "", disabled: false, match: "", replacement: "" } : undefined);
+
   return <div className='column padded'>
     <LargeTitle>Request Responder</LargeTitle>
     <Title1>Instructions</Title1>
@@ -196,7 +198,8 @@ export default function App() {
         </MessageBarBody>
       </MessageBar>}
     <RuleForm
-      rule={editRule || (showNewRule ? { id: "", name: "", disabled: false, match: "", replacement: "" } : undefined)}
+      key={ruleFormRule?.id}
+      rule={ruleFormRule}
       onClose={async (rule) => {
         if (rule) {
           const newRules = rules.slice();
@@ -235,9 +238,9 @@ interface RuleFormProps {
 function RuleForm(props: RuleFormProps) {
   const { rule, onClose } = props;
 
-  const [name, setName] = useState<string>("");
-  const [match, setMatch] = useState<string>("");
-  const [replacement, setReplacement] = useState<string>("");
+  const [name, setName] = useState<string | null>(null);
+  const [match, setMatch] = useState<string | null>(null);
+  const [replacement, setReplacement] = useState<string | null>(null);
   const [testUrl, setTestUrl] = useState<string>("");
   const [disabled, setDisabled] = useState<boolean | null>(null);
 
@@ -246,11 +249,11 @@ function RuleForm(props: RuleFormProps) {
   const editMode = Boolean(rule.id);
   const canTest = (match || rule?.match)?.trim() !== "" && (replacement || rule?.replacement)?.trim() !== "" && testUrl.trim() !== "";
   const canSave = (
-    (name.trim() !== "" && name !== rule?.name)
+    (name !== null && name.trim() !== "" && name !== rule?.name)
     ||
-    (match.trim() !== "" && match !== rule?.match)
+    (match !== null && match.trim() !== "" && match !== rule?.match)
     ||
-    (replacement.trim() !== "" && replacement !== rule?.replacement)
+    (replacement !== null && replacement.trim() !== "" && replacement !== rule?.replacement)
     ||
     (disabled !== null && disabled !== rule?.disabled)
   );
@@ -258,16 +261,16 @@ function RuleForm(props: RuleFormProps) {
   const onSave = () => {
     onClose({
       id: editMode ? rule!.id : crypto.randomUUID(),
-      name: name || rule?.name,
+      name: name !== null ? name : rule?.name,
       disabled: typeof disabled === "boolean" ? disabled : rule?.disabled,
-      match: match || rule?.match,
-      replacement: replacement || rule?.replacement,
+      match: match !== null ? match : rule?.match,
+      replacement: replacement !== null ? replacement : rule?.replacement,
     });
   };
 
   const onTest = () => {
-    const m = match || rule?.match;
-    const r = replacement || rule?.replacement;
+    const m = match !== null ? match : rule?.match;
+    const r = replacement !== null ? replacement : rule?.replacement;
     const t = testUrl;
     if (m && r && t) {
       const params = new URLSearchParams();
@@ -282,9 +285,9 @@ function RuleForm(props: RuleFormProps) {
 
   const onDismiss = (_: unknown, data: OnOpenChangeData) => {
     if (!data.open) {
-      setName("");
-      setMatch("");
-      setReplacement("");
+      setName(null);
+      setMatch(null);
+      setReplacement(null);
       setDisabled(null);
       setTestUrl("");
     }
@@ -299,19 +302,19 @@ function RuleForm(props: RuleFormProps) {
             <Label>
               <div className="column">
                 <span>Name</span>
-                <Input name='Name' placeholder='Name' value={name || rule?.name} onChange={(_, d) => setName(d.value)} />
+                <Input name='Name' placeholder='Name' value={name !== null ? name : rule?.name} onChange={(_, d) => setName(d.value)} />
               </div>
             </Label>
             <Label>
               <div className="column">
                 <span>Match Pattern</span>
-                <Input name='Match' placeholder='Match Pattern' value={match || rule?.match} onChange={(_, d) => setMatch(d.value)} />
+                <Input name='Match' placeholder='Match Pattern' value={match !== null ? match : rule?.match} onChange={(_, d) => setMatch(d.value)} />
               </div>
             </Label>
             <Label>
               <div className="column">
                 <span>Replacement</span>
-                <Input name='Replacement' placeholder='Replacement' value={replacement || rule?.replacement} onChange={(_, d) => setReplacement(d.value)} />
+                <Input name='Replacement' placeholder='Replacement' value={replacement !== null ? replacement : rule?.replacement} onChange={(_, d) => setReplacement(d.value)} />
               </div>
             </Label>
             <Label>

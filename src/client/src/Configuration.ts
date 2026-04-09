@@ -50,13 +50,11 @@ export async function loadRules(): Promise<Rule[]> {
 
 async function saveRulesToExtensionStorage(rules: Rule[]): Promise<void> {
     try {
-        const existingRules = await loadRulesFromExtensionStorage();
-        await chrome.storage.sync.set({ rules });
         const result = await chrome.runtime.sendMessage({
             type: "request-responder-rules-changed",
-            add: rules.filter(rule => !rule.disabled),
-            remove: existingRules
+            add: rules.filter(rule => !rule.disabled)
         });
+        await chrome.storage.sync.set({ rules });
         if (!result.ok) {
             throw result.error;
         }

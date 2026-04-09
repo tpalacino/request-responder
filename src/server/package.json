@@ -1,6 +1,6 @@
 {
   "name": "@request-responder/server",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "A simple server that only serves static files from the 'public' folder.",
   "main": "server.js",
   "scripts": {
