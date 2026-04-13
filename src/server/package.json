@@ -4,7 +4,7 @@
   "description": "A simple server that only serves static files from the 'public' folder.",
   "main": "server.js",
   "scripts": {
-    "build": "tsc -b && cp -r ./public ./README.md ./dist && cp ./package.json.template ./dist/package.json && cd ./dist && zip -r ./server.zip ./*",
+    "build": "tsc -b && shx cp -r ./public ./README.md ./dist && shx cp ./package.json.template ./dist/package.json && bestzip ./dist/server.zip ./dist/*",
     "dev": "npm run build && node ./dist/server.js"
   },
   "license": "UNLICENSED",

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "",
   "scripts": {
-    "build": "rm -rf ./dist && mkdir ./dist && cp logo.png manifest.json ./dist"
+    "build": "rimraf ./dist && mkdirp ./dist && shx cp logo.png manifest.json ./dist"
   },
   "keywords": [],
   "author": "",

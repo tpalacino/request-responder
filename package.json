@@ -17,14 +17,18 @@
     "build:extension": "npm run build -w @request-responder/extension",
     "build:server": "npm run build -w @request-responder/server",
     "build": "npm run build:client && npm run build:extension && npm run build:server",
-    "package:client": "cp -r ./src/client/dist/* ./dist/",
-    "package:extension": "cp -r ./src/extension/dist/* ./dist/",
-    "package:server": "cp -r ./src/server/dist/server.zip ./dist/",
-    "prepackage": "npm run build && rm -rf ./dist && mkdir ./dist",
+    "package:client": "shx cp -r ./src/client/dist/* ./dist/",
+    "package:extension": "shx cp -r ./src/extension/dist/* ./dist/",
+    "package:server": "shx cp -r ./src/server/dist/server.zip ./dist/",
+    "prepackage": "npm run build && rimraf ./dist && mkdirp ./dist",
     "package": "npm run package:client && npm run package:extension && npm run package:server",
-    "postpackage": "cd ./dist && zip -r ../request-responder-solution.zip ./*"
+    "postpackage": "bestzip request-responder-solution.zip ./dist/*"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "mkdirp": "^3.0.1",
+    "rimraf": "^6.1.3",
+    "shx": "^0.4.0",
+    "bestzip": "^2.2.3"
   }
 }
