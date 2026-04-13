@@ -77,7 +77,7 @@ export async function saveRules(rules: Rule[]): Promise<boolean> {
     try {
         await clearDynamicRules();
         if (Array.isArray(rules) && rules.length > 0) {
-            await updatedDeynamicRules(rules);
+            await updatedDeynamicRules(rules.filter(rule => !rule.disabled));
         }
         await chrome.storage.sync.set({ rules });
         return true;
