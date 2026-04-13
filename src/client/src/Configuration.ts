@@ -1,5 +1,23 @@
 import "chrome-types/index.d.ts";
 
+const RESOURCE_TYPES: chrome.declarativeNetRequest.ResourceType[] = [
+    "csp_report",
+    "font",
+    "image",
+    "main_frame",
+    "media",
+    "object",
+    "other",
+    "ping",
+    "script",
+    "stylesheet",
+    "sub_frame",
+    "webbundle",
+    "websocket",
+    "webtransport",
+    "xmlhttprequest",
+];
+
 export interface Rule {
     id: string;
     name: string;
@@ -8,9 +26,7 @@ export interface Rule {
     replacement: string;
 }
 
-const isExtension = typeof chrome !== "undefined" && typeof chrome.storage !== "undefined";
-
-async function loadRulesFromExtensionStorage(): Promise<Rule[]> {
+export async function loadRules(): Promise<Rule[]> {
     const rules: Rule[] = [];
     try {
         const raw = await chrome.storage.sync.get("rules");
@@ -25,56 +41,66 @@ async function loadRulesFromExtensionStorage(): Promise<Rule[]> {
     return rules;
 }
 
-function loadRulesFromBrowserStorage(): Rule[] {
-    const rules: Rule[] = [];
+async function clearDynamicRules(): Promise<void> {
     try {
-        const raw = localStorage.getItem("rules");
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            for (const rule of parsed) {
-                rules.push(rule);
+        const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
+        await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existingRules.map(rule => rule.id) });
+    } catch (error) {
+        console.error("Failed to clear existing dynamic rules:", error);
+        throw new Error("Failed to clear existing dynamic rules: ", { cause: error });
+    }
+}
+
+async function updatedDeynamicRules(rules: Rule[]): Promise<void> {
+    try {
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            addRules: rules.map((rule, index) => ({
+                id: index + 1,
+                priority: 1,
+                action: {
+                    type: "redirect",
+                    redirect: { regexSubstitution: rule.replacement }
+                },
+                condition: {
+                    regexFilter: rule.match,
+                    resourceTypes: ["csp_report", "font", "image", "main_frame", "media", "object", "other", "ping", "script", "stylesheet", "sub_frame", "webbundle", "websocket", "webtransport", "xmlhttprequest"]
+                }
+            }))
+        });
+    } catch (error) {
+        console.error("Failed to add new dynamic rules:", error);
+        throw new Error("Failed to add new dynamic rules: ", { cause: error });
+    }
+}
+
+export async function saveRules(rules: Rule[]): Promise<boolean> {
+    try {
+        await clearDynamicRules();
+        if (Array.isArray(rules) && rules.length > 0) {
+            await updatedDeynamicRules(rules);
+        }
+        await chrome.storage.sync.set({ rules });
+        return true;
+    } catch (error) {
+        console.error("Failed to save rules:", error);
+        return false;
+    }
+}
+
+export async function testMatch(testUrl: string): Promise<number[]> {
+    try {
+        for (const resourceType of RESOURCE_TYPES) {
+            const result = await chrome.declarativeNetRequest.testMatchOutcome({
+                url: testUrl,
+                type: resourceType,
+                tabId: 0,
+            });
+            if (result && result.matchedRules && result.matchedRules.length > 0) {
+                return result.matchedRules.map(rule => rule.ruleId);
             }
         }
     } catch (error) {
-        console.error("Failed to load rules:", error);
+        console.error("Failed to test rule:", error);
     }
-    return rules;
-}
-
-export async function loadRules(): Promise<Rule[]> {
-    if (isExtension) {
-        return await loadRulesFromExtensionStorage();
-    }
-    return loadRulesFromBrowserStorage();
-}
-
-async function saveRulesToExtensionStorage(rules: Rule[]): Promise<void> {
-    try {
-        const result = await chrome.runtime.sendMessage({
-            type: "request-responder-rules-changed",
-            add: rules.filter(rule => !rule.disabled)
-        });
-        await chrome.storage.sync.set({ rules });
-        if (!result.ok) {
-            throw result.error;
-        }
-    } catch (error) {
-        console.error("Failed to save rules:", error);
-    }
-}
-
-function saveRulesToBrowserStorage(rules: Rule[]): void {
-    try {
-        localStorage.setItem("rules", JSON.stringify(rules));
-    } catch (error) {
-        console.error("Failed to save rules:", error);
-    }
-}
-
-export async function saveRules(rules: Rule[]): Promise<void> {
-    if (isExtension) {
-        await saveRulesToExtensionStorage(rules);
-    } else {
-        saveRulesToBrowserStorage(rules);
-    }
+    return [];
 }

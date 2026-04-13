@@ -13,8 +13,5 @@
     "host_permissions": [
         "*://*/*"
     ],
-    "background": {
-        "service_worker": "worker.js"
-    },
     "options_page": "index.html"
 }

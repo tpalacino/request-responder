@@ -23,3 +23,13 @@
 .grow {
     flex-grow: 1;
 }
+
+.match, .match:hover {
+    background-color: var(--colorStatusSuccessBackground1);
+    color: var(--colorStatusSuccessForeground1);
+}
+
+.non-match, .non-match:hover {
+    background-color: var(--colorStatusDangerBackground1);
+    color: var(--colorStatusDangerForeground1);
+}

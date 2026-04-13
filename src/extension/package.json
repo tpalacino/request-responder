@@ -2,9 +2,8 @@
   "name": "@request-responder/extension",
   "version": "0.0.0",
   "description": "",
-  "main": "worker.js",
   "scripts": {
-    "build": "rm -rf ./dist && mkdir ./dist && cp logo.png manifest.json worker.js ./dist"
+    "build": "rm -rf ./dist && mkdir ./dist && cp logo.png manifest.json ./dist"
   },
   "keywords": [],
   "author": "",

@@ -1,14 +1,23 @@
-import { Body2, Button, createTableColumn, DataGrid, DataGridBody, DataGridCell, DataGridHeader, DataGridHeaderCell, DataGridRow, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, DialogTrigger, Input, Label, LargeTitle, Link, makeStyles, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Switch, TableCellLayout, Title1, type OnOpenChangeData, type TableColumnDefinition } from "@fluentui/react-components";
+import { Body2, Button, createTableColumn, DataGrid, DataGridBody, DataGridCell, DataGridHeader, DataGridHeaderCell, DataGridRow, Input, LargeTitle, Link, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, TableCellActions, TableCellLayout, Title1, type TableColumnDefinition, type TableColumnId } from "@fluentui/react-components";
 import { AddRegular, CheckmarkCircleRegular, CircleOffRegular, CloudArrowDownRegular, CloudArrowUpRegular, DeleteRegular, EditRegular, MoreVerticalRegular } from "@fluentui/react-icons";
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './App.css';
-import { loadRules, saveRules, type Rule } from './Configuration';
+import { loadRules, saveRules, testMatch, type Rule } from './Configuration';
+import { DeletePrompt } from "./components/DeletePrompt";
+import { RuleForm } from "./components/RuleForm";
+
+type AppRule = Rule & {
+  isMatch?: boolean;
+}
 
 export default function App() {
-  const [rules, setRules] = useState<Rule[]>([]);
+  const [rules, setRules] = useState<AppRule[]>([]);
   const [showNewRule, setShowNewRule] = useState<boolean>(false);
-  const [editRule, setEditRule] = useState<Rule | undefined>(undefined);
-  const [deleteRule, setDeleteRule] = useState<Rule | undefined>(undefined);
+  const [editRule, setEditRule] = useState<AppRule | undefined>(undefined);
+  const [deleteRule, setDeleteRule] = useState<AppRule | undefined>(undefined);
+  const [testUrl, setTestUrl] = useState<string>("");
+
+  const testMatchId = useRef<number>(NaN);
 
   useEffect(() => {
     async function init() {
@@ -46,7 +55,7 @@ export default function App() {
         try {
           const newRules = rules.slice();
           const text = await file.text();
-          const importedRules: Rule[] = JSON.parse(text);
+          const importedRules: AppRule[] = JSON.parse(text);
           for (const rule of importedRules) {
             if (typeof rule.name === "string" && typeof rule.match === "string" && typeof rule.replacement === "string" && typeof rule.disabled === "boolean") {
               if (typeof rule.id !== "string" || !rule.id) {
@@ -75,8 +84,30 @@ export default function App() {
     });
   };
 
-  const columns: TableColumnDefinition<Rule>[] = [
-    createTableColumn<Rule>({
+  const onTest = async (newTestUrl: string) => {
+    if (!isNaN(testMatchId.current)) {
+      window.clearTimeout(testMatchId.current);
+    }
+    if (URL.canParse(newTestUrl)) {
+      testMatchId.current = window.setTimeout(async () => {
+        try {
+          const matchingRuleIds = await testMatch(newTestUrl);
+          setRules(rules.map((rule, index) => ({
+            ...rule,
+            isMatch: matchingRuleIds.includes(index + 1),
+          })));
+        } catch (error) {
+          console.error("Failed to test URL:", error);
+        } finally {
+          testMatchId.current = NaN;
+        }
+      }, 450);
+    }
+    setTestUrl(newTestUrl);
+  }
+
+  const columns: TableColumnDefinition<AppRule>[] = [
+    createTableColumn<AppRule>({
       columnId: "name",
       compare: (a, b) => {
         return a.name.localeCompare(b.name);
@@ -86,72 +117,89 @@ export default function App() {
       },
       renderCell: (item) => {
         return (
-          <div className="row grow">
-            <TableCellLayout style={{ color: item.disabled ? "gray" : "inherit" }}>
-              {item.name}{` (${item.disabled ? "Disabled" : "Enabled"})`}
-            </TableCellLayout>
-            <Menu positioning={{ autoSize: true }}>
-              <MenuTrigger disableButtonEnhancement>
-                <Button icon={<MoreVerticalRegular />} />
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  <MenuItem icon={<EditRegular />} onClick={() => setEditRule(item)}>Edit</MenuItem>
-                  <MenuItem icon={<DeleteRegular />} onClick={() => setDeleteRule(item)}>Delete</MenuItem>
-                  <MenuItem
-                    icon={item.disabled ? <CheckmarkCircleRegular /> : <CircleOffRegular />}
-                    onClick={async () => {
-                      const newRules = rules.slice();
-                      const targetRule = newRules.find(r => r.id === item.id);
-                      if (targetRule) {
-                        targetRule.disabled = !item.disabled;
-                        await saveRules(newRules);
-                        setRules(newRules);
-                      }
-                    }}
-                  >
-                    {item.disabled ? "Enable" : "Disable"}
-                  </MenuItem>
-                </MenuList>
-              </MenuPopover>
-            </Menu>
-          </div>
+          <TableCellLayout truncate style={{ color: item.disabled ? "gray" : "inherit" }}>
+            {item.name}{` (${item.disabled ? "Disabled" : "Enabled"})`}
+            <TableCellActions>
+              <Menu>
+                <MenuTrigger disableButtonEnhancement>
+                  <Button icon={<MoreVerticalRegular />} />
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    <MenuItem icon={<EditRegular />} onClick={() => setEditRule(item)}>Edit</MenuItem>
+                    <MenuItem icon={<DeleteRegular />} onClick={() => setDeleteRule(item)}>Delete</MenuItem>
+                    <MenuItem
+                      icon={item.disabled ? <CheckmarkCircleRegular /> : <CircleOffRegular />}
+                      onClick={async () => {
+                        const newRules = rules.slice();
+                        const targetRule = newRules.find(r => r.id === item.id);
+                        if (targetRule) {
+                          targetRule.disabled = !item.disabled;
+                          await saveRules(newRules);
+                          setRules(newRules);
+                        }
+                      }}
+                    >
+                      {item.disabled ? "Enable" : "Disable"}
+                    </MenuItem>
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+            </TableCellActions>
+          </TableCellLayout>
         );
       },
     }),
-    createTableColumn<Rule>({
-      columnId: "request",
+    createTableColumn<AppRule>({
+      columnId: "match",
       compare: (a, b) => {
         return a.match.localeCompare(b.match);
       },
       renderHeaderCell: () => {
-        return "Request";
+        return "Match Pattern";
       },
       renderCell: (item) => {
         return (
-          <TableCellLayout style={{ color: item.disabled ? "gray" : "inherit" }}>
+          <TableCellLayout truncate style={{ color: item.disabled ? "gray" : "inherit" }}>
             {item.match}
           </TableCellLayout>
         );
       },
     }),
-    createTableColumn<Rule>({
-      columnId: "response",
+    createTableColumn<AppRule>({
+      columnId: "replacement",
       compare: (a, b) => {
         return a.replacement.localeCompare(b.replacement);
       },
       renderHeaderCell: () => {
-        return "Response";
+        return "Replacement";
       },
       renderCell: (item) => {
         return (
-          <TableCellLayout style={{ color: item.disabled ? "gray" : "inherit" }}>
+          <TableCellLayout truncate style={{ color: item.disabled ? "gray" : "inherit" }}>
             {item.replacement}
           </TableCellLayout>
         );
       },
     }),
   ];
+
+  const isTesting = testUrl.trim() !== "";
+  if (isTesting) {
+    columns.unshift(createTableColumn<AppRule>({
+      columnId: "isMatch",
+      renderHeaderCell: () => {
+        return "Match";
+      },
+      renderCell: (item) => {
+        return (
+          <TableCellLayout>
+            {item.isMatch ? <CheckmarkCircleRegular style={{ color: "green" }} /> : <CircleOffRegular style={{ color: "red" }} />}
+          </TableCellLayout>
+        );
+      },
+    }));
+  }
 
   const ruleFormRule = editRule || (showNewRule ? { id: "", name: "", disabled: false, match: "", replacement: "" } : undefined);
 
@@ -162,9 +210,14 @@ export default function App() {
     <Body2>We package a lightweight server to handle serving static files. <Link href="server.zip">server.zip</Link></Body2>
     <Title1>Rules</Title1>
     <div className='row'>
-      <Button appearance='primary' onClick={() => setShowNewRule(true)} icon={<AddRegular />}>Add</Button>
-      <Button appearance='secondary' onClick={onImport} icon={<CloudArrowUpRegular />}>Import</Button>
-      <Button appearance='secondary' disabled={!rules.length} onClick={onExport} icon={<CloudArrowDownRegular />}>Export</Button>
+      <div className="row grow">
+        <Button appearance='primary' onClick={() => setShowNewRule(true)} icon={<AddRegular />}>Add</Button>
+        <Button appearance='secondary' onClick={onImport} icon={<CloudArrowUpRegular />}>Import</Button>
+        <Button appearance='secondary' disabled={!rules.length} onClick={onExport} icon={<CloudArrowDownRegular />}>Export</Button>
+      </div>
+      <div className="row grow">
+        <Input name='TestUrl' className="grow" placeholder='Test URL' onChange={(_, d) => onTest(d.value)} />
+      </div>
     </div>
     {rules.length > 0
       ? <div style={{ overflowX: "auto" }}>
@@ -176,16 +229,16 @@ export default function App() {
         >
           <DataGridHeader>
             <DataGridRow>
-              {({ renderHeaderCell }) => (
-                <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
+              {({ renderHeaderCell, columnId }) => (
+                <DataGridHeaderCell style={getStyle(columnId, columns.length)} >{renderHeaderCell()}</DataGridHeaderCell>
               )}
             </DataGridRow>
           </DataGridHeader>
-          <DataGridBody<Rule>>
+          <DataGridBody<AppRule>>
             {({ item, rowId }) => (
-              <DataGridRow<Rule> key={rowId}>
-                {({ renderCell }) => (
-                  <DataGridCell>{renderCell(item)}</DataGridCell>
+              <DataGridRow<AppRule> key={rowId} className={testUrl ? (item.isMatch ? "match" : "non-match") : undefined}>
+                {({ renderCell, columnId }) => (
+                  <DataGridCell style={getStyle(columnId, columns.length)} >{renderCell(item)}</DataGridCell>
                 )}
               </DataGridRow>
             )}
@@ -230,182 +283,17 @@ export default function App() {
   </div>
 }
 
-interface RuleFormProps {
-  rule: Rule | undefined;
-  onClose: (rule?: Rule) => void;
-}
+const IS_MATCH_WIDTH = 42;
 
-function RuleForm(props: RuleFormProps) {
-  const { rule, onClose } = props;
-
-  const [name, setName] = useState<string | null>(null);
-  const [match, setMatch] = useState<string | null>(null);
-  const [replacement, setReplacement] = useState<string | null>(null);
-  const [testUrl, setTestUrl] = useState<string>("");
-  const [disabled, setDisabled] = useState<boolean | null>(null);
-
-  if (!rule) return null;
-
-  const editMode = Boolean(rule.id);
-  const canTest = (match || rule?.match)?.trim() !== "" && (replacement || rule?.replacement)?.trim() !== "" && testUrl.trim() !== "";
-  const canSave = (
-    (name !== null && name.trim() !== "" && name !== rule?.name)
-    ||
-    (match !== null && match.trim() !== "" && match !== rule?.match)
-    ||
-    (replacement !== null && replacement.trim() !== "" && replacement !== rule?.replacement)
-    ||
-    (disabled !== null && disabled !== rule?.disabled)
-  );
-
-  const onSave = () => {
-    onClose({
-      id: editMode ? rule!.id : crypto.randomUUID(),
-      name: name !== null ? name : rule?.name,
-      disabled: typeof disabled === "boolean" ? disabled : rule?.disabled,
-      match: match !== null ? match : rule?.match,
-      replacement: replacement !== null ? replacement : rule?.replacement,
-    });
-  };
-
-  const onTest = () => {
-    const m = match !== null ? match : rule?.match;
-    const r = replacement !== null ? replacement : rule?.replacement;
-    const t = testUrl;
-    if (m && r && t) {
-      const params = new URLSearchParams();
-      params.set("engine", "pcre");
-      params.set("expression", m);
-      params.set("text", t);
-      params.set("tool", "replace");
-      params.set("input", r);
-      window.open(`https://regexr.com/?${params.toString()}`, "_blank");
-    }
-  };
-
-  const onDismiss = (_: unknown, data: OnOpenChangeData) => {
-    if (!data.open) {
-      setName(null);
-      setMatch(null);
-      setReplacement(null);
-      setDisabled(null);
-      setTestUrl("");
-    }
-  };
-
-  return <Dialog open={true} onOpenChange={onDismiss}>
-    <DialogSurface>
-      <DialogBody>
-        <DialogTitle>{editMode ? "Edit Rule" : "Add Rule"}</DialogTitle>
-        <DialogContent>
-          <div className='column padded'>
-            <Label>
-              <div className="column">
-                <span>Name</span>
-                <Input name='Name' placeholder='Name' value={name !== null ? name : rule?.name} onChange={(_, d) => setName(d.value)} />
-              </div>
-            </Label>
-            <Label>
-              <div className="column">
-                <span>Match Pattern</span>
-                <Input name='Match' placeholder='Match Pattern' value={match !== null ? match : rule?.match} onChange={(_, d) => setMatch(d.value)} />
-              </div>
-            </Label>
-            <Label>
-              <div className="column">
-                <span>Replacement</span>
-                <Input name='Replacement' placeholder='Replacement' value={replacement !== null ? replacement : rule?.replacement} onChange={(_, d) => setReplacement(d.value)} />
-              </div>
-            </Label>
-            <Label>
-              <div className="column">
-                <span>Disabled</span>
-                <Switch
-                  name='Disabled'
-                  placeholder='Disabled'
-                  checked={typeof disabled === "boolean" ? disabled : rule?.disabled}
-                  onChange={(_, d) => {
-                    setDisabled(d.checked !== rule?.disabled ? d.checked : null);
-                  }}
-                />
-              </div>
-            </Label>
-            <Label>
-              <div className="column">
-                <span>Test URL</span>
-                <TestUrlField value={testUrl} canTest={canTest} onChange={setTestUrl} onTest={onTest} />
-              </div>
-            </Label>
-          </div>
-        </DialogContent>
-        <DialogActions>
-          <Button appearance="primary" onClick={() => onSave()} disabled={!canSave}>Save</Button>
-          <DialogTrigger disableButtonEnhancement>
-            <Button appearance="secondary" onClick={() => onClose(undefined)}>Cancel</Button>
-          </DialogTrigger>
-        </DialogActions>
-      </DialogBody>
-    </DialogSurface>
-  </Dialog>
-}
-
-interface DeletePromptProps {
-  rule: Rule | undefined;
-  onClose: (confirmed: boolean) => void;
-}
-
-function DeletePrompt(props: DeletePromptProps) {
-  const { rule, onClose } = props;
-
-  if (!rule) return null;
-
-  return <Dialog open={true}>
-    <DialogSurface>
-      <DialogBody>
-        <DialogTitle>Delete Rule</DialogTitle>
-        <DialogContent>
-          Are you sure you want to delete the rule "{rule.name}"?
-        </DialogContent>
-        <DialogActions>
-          <Button appearance="primary" onClick={() => onClose(true)}>Delete</Button>
-          <Button appearance="secondary" onClick={() => onClose(false)}>Cancel</Button>
-        </DialogActions>
-      </DialogBody>
-    </DialogSurface>
-  </Dialog>
-}
-
-const useTextUrlFieldStyles = makeStyles({
-  root: {
-    display: "flex",
-    width: "100%",
-  },
-  input: {
-    flexGrow: 1,
-    borderTopRightRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  button: {
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
-  },
-});
-
-interface TestUrlFieldProps {
-  value: string;
-  canTest: boolean;
-  onChange: (value: string) => void;
-  onTest: () => void;
-}
-
-function TestUrlField(props: TestUrlFieldProps) {
-  const { value, canTest, onChange, onTest } = props;
-  const styles = useTextUrlFieldStyles();
-
-  return (
-    <div className={styles.root}>
-      <Input className={styles.input} name='TestURL' placeholder='Test URL' value={value} onChange={(_, d) => onChange(d.value)} />
-      <Button className={styles.button} appearance="outline" onClick={onTest} disabled={!canTest}>Test</Button>
-    </div>
-  );
+function getStyle(columnId: TableColumnId, columnCount: number): React.CSSProperties | undefined {
+  if (columnId === "isMatch") {
+    return { width: IS_MATCH_WIDTH, minWidth: IS_MATCH_WIDTH, maxWidth: IS_MATCH_WIDTH };
+  } else {
+    return {
+      width: `calc(${100 / columnCount}% - ${IS_MATCH_WIDTH}px)`,
+      minWidth: `calc(${100 / columnCount}% - ${IS_MATCH_WIDTH}px)`,
+      maxWidth: `calc(${100 / columnCount}% - ${IS_MATCH_WIDTH}px)`,
+    };
+  }
+  return undefined;
 }
