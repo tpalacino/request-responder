@@ -1,6 +1,6 @@
 import { Body2, Button, createTableColumn, DataGrid, DataGridBody, DataGridCell, DataGridHeader, DataGridHeaderCell, DataGridRow, Input, LargeTitle, Link, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, TableCellActions, TableCellLayout, Title1, type TableColumnDefinition, type TableColumnId } from "@fluentui/react-components";
 import { AddRegular, CheckmarkCircleRegular, CircleOffRegular, CloudArrowDownRegular, CloudArrowUpRegular, DeleteRegular, EditRegular, MoreVerticalRegular } from "@fluentui/react-icons";
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import { loadRules, saveRules, testMatch, type Rule } from './Configuration';
 import { DeletePrompt } from "./components/DeletePrompt";
@@ -19,13 +19,51 @@ export default function App() {
 
   const testMatchId = useRef<number>(NaN);
 
+  const testRules = useCallback(async (newRules: AppRule[], newTestUrl: string, delay: number = 450) => {
+    if (!isNaN(testMatchId.current)) {
+      window.clearTimeout(testMatchId.current);
+    }
+    if (delay > 0) {
+      testMatchId.current = window.setTimeout(() => testRules(newRules, newTestUrl, 0), delay);
+      return;
+    }
+    if (!newTestUrl) {
+      setRules(newRules.map(rule => ({ ...rule, isMatch: false })));
+      return;
+    }
+    try {
+      const matchingRuleIds = await testMatch(newTestUrl);
+      let enabledIndex = 1;
+
+      setRules(newRules.map(rule => {
+        if (rule.disabled) {
+          return { ...rule, isMatch: false };
+        }
+
+        const isMatch = matchingRuleIds.includes(enabledIndex);
+        enabledIndex++;
+
+        return { ...rule, isMatch };
+      }));
+    } catch (error) {
+      console.error("Failed to test URL:", error);
+    } finally {
+      testMatchId.current = NaN;
+    }
+  }, []);
+
+  const handleRulesChanged = useCallback((newRules: AppRule[]) => {
+    setRules(newRules);
+    testRules(newRules, testUrl);
+  }, [testRules, testUrl]);
+
   useEffect(() => {
     async function init() {
       const loadedRules = await loadRules();
-      setRules(loadedRules);
+      handleRulesChanged(loadedRules);
     }
     init();
-  }, []);
+  }, [handleRulesChanged]);
 
   const onExport = () => {
     const dataStr = JSON.stringify(rules, null, 4);
@@ -74,7 +112,7 @@ export default function App() {
             }
           }
           await saveRules(newRules);
-          setRules(newRules);
+          handleRulesChanged(newRules);
         } catch (error) {
           console.error("Failed to import rules:", error);
           alert("Failed to import rules. Please make sure the file is a valid JSON with the correct format.");
@@ -85,25 +123,15 @@ export default function App() {
   };
 
   const onTest = async (newTestUrl: string) => {
-    if (!isNaN(testMatchId.current)) {
-      window.clearTimeout(testMatchId.current);
-    }
-    if (URL.canParse(newTestUrl)) {
-      testMatchId.current = window.setTimeout(async () => {
-        try {
-          const matchingRuleIds = await testMatch(newTestUrl);
-          setRules(rules.map((rule, index) => ({
-            ...rule,
-            isMatch: matchingRuleIds.includes(index + 1),
-          })));
-        } catch (error) {
-          console.error("Failed to test URL:", error);
-        } finally {
-          testMatchId.current = NaN;
-        }
-      }, 450);
-    }
     setTestUrl(newTestUrl);
+    if (URL.canParse(newTestUrl)) {
+      testRules(rules, newTestUrl);
+    }
+  }
+
+  const onClear = async () => {
+    setTestUrl("");
+    testRules(rules, "", 0);
   }
 
   const columns: TableColumnDefinition<AppRule>[] = [
@@ -136,7 +164,7 @@ export default function App() {
                         if (targetRule) {
                           targetRule.disabled = !item.disabled;
                           await saveRules(newRules);
-                          setRules(newRules);
+                          handleRulesChanged(newRules);
                         }
                       }}
                     >
@@ -184,7 +212,7 @@ export default function App() {
     }),
   ];
 
-  const isTesting = testUrl.trim() !== "";
+  const isTesting = testUrl.trim() !== "" && isNaN(testMatchId.current);
   if (isTesting) {
     columns.unshift(createTableColumn<AppRule>({
       columnId: "isMatch",
@@ -194,7 +222,9 @@ export default function App() {
       renderCell: (item) => {
         return (
           <TableCellLayout>
-            {item.isMatch ? <CheckmarkCircleRegular style={{ color: "green" }} /> : <CircleOffRegular style={{ color: "red" }} />}
+            {item.isMatch
+              ? <CheckmarkCircleRegular style={{ color: "green" }} />
+              : <CircleOffRegular style={{ color: "red" }} />}
           </TableCellLayout>
         );
       },
@@ -216,7 +246,8 @@ export default function App() {
         <Button appearance='secondary' disabled={!rules.length} onClick={onExport} icon={<CloudArrowDownRegular />}>Export</Button>
       </div>
       <div className="row grow">
-        <Input name='TestUrl' className="grow" placeholder='Test URL' onChange={(_, d) => onTest(d.value)} />
+        <Input name='TestUrl' className="grow" placeholder='Test URL' value={testUrl} onChange={(_, d) => onTest(d.value)} />
+        <Button appearance='secondary' disabled={!rules.length} onClick={onClear} icon={<DeleteRegular />}>Clear</Button>
       </div>
     </div>
     {rules.length > 0
@@ -236,7 +267,7 @@ export default function App() {
           </DataGridHeader>
           <DataGridBody<AppRule>>
             {({ item, rowId }) => (
-              <DataGridRow<AppRule> key={rowId} className={testUrl ? (item.isMatch ? "match" : "non-match") : undefined}>
+              <DataGridRow<AppRule> key={rowId} className={isTesting ? (item.isMatch ? "match" : "non-match") : undefined}>
                 {({ renderCell, columnId }) => (
                   <DataGridCell style={getStyle(columnId, columns.length)} >{renderCell(item)}</DataGridCell>
                 )}
@@ -263,7 +294,7 @@ export default function App() {
             newRules.push(rule);
           }
           await saveRules(newRules);
-          setRules(newRules);
+          handleRulesChanged(newRules);
         }
         setShowNewRule(false);
         setEditRule(undefined);
@@ -275,7 +306,7 @@ export default function App() {
         if (confirmed && deleteRule) {
           const newRules = rules.filter(r => r.id !== deleteRule.id);
           await saveRules(newRules);
-          setRules(newRules);
+          handleRulesChanged(newRules);
         }
         setDeleteRule(undefined);
       }}
