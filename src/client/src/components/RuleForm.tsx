@@ -66,7 +66,7 @@ export function RuleForm(props: RuleFormProps) {
                                         <div>
                                             <span>I recommend using RegExr to validate the pattern.</span>
                                             <br />
-                                            <Link href="https://regexr.com/?engine=pcre&tool=replace">RegExr</Link>
+                                            <Link href="https://regexr.com/?engine=pcre&tool=replace" target="_blank">RegExr</Link>
                                         </div>
                                     )}
                                 >

@@ -1,22 +1,5 @@
 import "chrome-types/index.d.ts";
-
-const RESOURCE_TYPES: chrome.declarativeNetRequest.ResourceType[] = [
-    "csp_report",
-    "font",
-    "image",
-    "main_frame",
-    "media",
-    "object",
-    "other",
-    "ping",
-    "script",
-    "stylesheet",
-    "sub_frame",
-    "webbundle",
-    "websocket",
-    "webtransport",
-    "xmlhttprequest",
-];
+import { RE2JS } from "re2js";
 
 export interface Rule {
     id: string;
@@ -89,16 +72,28 @@ export async function saveRules(rules: Rule[]): Promise<boolean> {
 
 export async function testMatch(testUrl: string): Promise<number[]> {
     try {
-        for (const resourceType of RESOURCE_TYPES) {
-            const result = await chrome.declarativeNetRequest.testMatchOutcome({
-                url: testUrl,
-                type: resourceType,
-                tabId: 0,
-            });
-            if (result && result.matchedRules && result.matchedRules.length > 0) {
-                return result.matchedRules.map(rule => rule.ruleId);
+        const rules = await loadRules();
+        const matches: number[] = [];
+        let enabledRuleId = 1;
+
+        for (const rule of rules) {
+            if (rule.disabled) {
+                continue;
             }
+
+            try {
+                const re2 = RE2JS.compile(rule.match);
+                if (re2.test(testUrl)) {
+                    matches.push(enabledRuleId);
+                }
+            } catch (error) {
+                console.warn(`Skipping invalid RE2 pattern for rule '${rule.name}' (${rule.id}):`, error);
+            }
+
+            enabledRuleId++;
         }
+
+        return matches;
     } catch (error) {
         console.error("Failed to test rule:", error);
     }
