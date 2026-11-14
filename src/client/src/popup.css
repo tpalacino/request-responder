@@ -1,0 +1,39 @@
+body {
+  margin: 0;
+  width: 360px;
+}
+
+.popup {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.popup-header, .rule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rules-list {
+  list-style: none;
+  margin: 0;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.rule {
+  border-top: 1px solid var(--colorNeutralStroke2);
+  min-height: 48px;
+}
+
+.rule-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

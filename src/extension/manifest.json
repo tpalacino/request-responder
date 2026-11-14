@@ -13,5 +13,13 @@
     "host_permissions": [
         "*://*/*"
     ],
+    "action": {
+        "default_title": "Request Responder",
+        "default_popup": "popup.html"
+    },
+    "background": {
+        "service_worker": "background.js",
+        "type": "module"
+    },
     "options_page": "index.html"
 }
