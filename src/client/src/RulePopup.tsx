@@ -1,0 +1,109 @@
+import { Button, MessageBar, MessageBarBody, Spinner, Switch, Text, Title3 } from "@fluentui/react-components";
+import { SettingsRegular } from "@fluentui/react-icons";
+import { useEffect, useId, useRef, useState } from "react";
+import { loadRules, type Rule } from "./Configuration";
+
+function RuleRow({ rule, saving, onToggle }: { rule: Rule; saving: boolean; onToggle: (id: string, enabled: boolean) => void }) {
+  const detailsId = useId();
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <li className="rule">
+      <div className="rule-summary">
+        <button
+          type="button"
+          className="rule-name"
+          title={rule.name}
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          onClick={() => setExpanded(value => !value)}
+        >
+          {rule.name}
+        </button>
+        <Switch
+          aria-label={rule.name}
+          checked={!rule.disabled}
+          disabled={saving}
+          onChange={(_, data) => onToggle(rule.id, data.checked)}
+        />
+      </div>
+      <div id={detailsId} className="rule-details" hidden={!expanded}>
+        <div><strong>Match pattern</strong><div className="rule-value">{rule.match}</div></div>
+        <div><strong>Replacement</strong><div className="rule-value">{rule.replacement}</div></div>
+      </div>
+    </li>
+  );
+}
+
+export function Popup() {
+  const [rules, setRules] = useState<Rule[] | null>(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    let changed = false;
+    const onStorageChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area === "sync" && changes.rules) {
+        changed = true;
+        setRules(changes.rules.newValue ?? []);
+      }
+    };
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    loadRules().then(loaded => {
+      if (active && !changed) setRules(loaded);
+    }).catch(() => {
+      if (active) setError("Could not load rules. Close and reopen the popup to retry.");
+    });
+    return () => {
+      active = false;
+      chrome.storage.onChanged.removeListener(onStorageChanged);
+    };
+  }, []);
+
+  const toggleRule = async (id: string, enabled: boolean) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      const result: { error?: string } = await chrome.runtime.sendMessage({ type: "toggleRule", id, enabled });
+      if (result.error) setError(result.error);
+    } catch (error) {
+      console.error("Failed to update rule:", error);
+      setError("Could not update the rule. Please try again.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  const openOptions = async () => {
+    try {
+      await chrome.runtime.openOptionsPage();
+    } catch (error) {
+      console.error("Failed to open options:", error);
+      setError("Could not open the options page.");
+    }
+  };
+
+  return (
+    <main className="popup">
+      <header className="popup-header">
+        <Title3>Request Responder Rules</Title3>
+        <Button appearance="subtle" icon={<SettingsRegular />} aria-label="Open options" onClick={() => { void openOptions(); }} />
+      </header>
+      {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
+      {rules === null
+        ? !error && <Spinner label="Loading rules..." />
+        : rules.length === 0
+          ? <Text>No rules yet. Open Options to add a rule.</Text>
+          : <ul className="rules-list" aria-label="Rules">
+            {rules.map(rule => (
+              <RuleRow key={rule.id} rule={rule} saving={saving} onToggle={(id, enabled) => { void toggleRule(id, enabled); }} />
+            ))}
+          </ul>}
+    </main>
+  );
+}

@@ -20,24 +20,17 @@ export async function loadRules(): Promise<Rule[]> {
         }
     } catch (error) {
         console.error("Failed to load rules:", error);
+        throw error;
     }
     return rules;
 }
 
-async function clearDynamicRules(): Promise<void> {
+export async function saveRules(rules: Rule[]): Promise<boolean> {
     try {
         const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
-        await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existingRules.map(rule => rule.id) });
-    } catch (error) {
-        console.error("Failed to clear existing dynamic rules:", error);
-        throw new Error("Failed to clear existing dynamic rules: ", { cause: error });
-    }
-}
-
-async function updatedDeynamicRules(rules: Rule[]): Promise<void> {
-    try {
         await chrome.declarativeNetRequest.updateDynamicRules({
-            addRules: rules.map((rule, index) => ({
+            removeRuleIds: existingRules.map(rule => rule.id),
+            addRules: rules.filter(rule => !rule.disabled).map((rule, index) => ({
                 id: index + 1,
                 priority: 1,
                 action: {
@@ -50,19 +43,20 @@ async function updatedDeynamicRules(rules: Rule[]): Promise<void> {
                 }
             }))
         });
-    } catch (error) {
-        console.error("Failed to add new dynamic rules:", error);
-        throw new Error("Failed to add new dynamic rules: ", { cause: error });
-    }
-}
-
-export async function saveRules(rules: Rule[]): Promise<boolean> {
-    try {
-        await clearDynamicRules();
-        if (Array.isArray(rules) && rules.length > 0) {
-            await updatedDeynamicRules(rules.filter(rule => !rule.disabled));
+        try {
+            await chrome.storage.sync.set({ rules });
+        } catch (error) {
+            try {
+                const currentRules = await chrome.declarativeNetRequest.getDynamicRules();
+                await chrome.declarativeNetRequest.updateDynamicRules({
+                    removeRuleIds: currentRules.map(rule => rule.id),
+                    addRules: existingRules,
+                });
+            } catch (rollbackError) {
+                console.error("Failed to restore dynamic rules after a storage error:", rollbackError);
+            }
+            throw error;
         }
-        await chrome.storage.sync.set({ rules });
         return true;
     } catch (error) {
         console.error("Failed to save rules:", error);

@@ -1,4 +1,4 @@
-import { Body2, Button, createTableColumn, DataGrid, DataGridBody, DataGridCell, DataGridHeader, DataGridHeaderCell, DataGridRow, Input, LargeTitle, Link, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, TableCellActions, TableCellLayout, Title1, type TableColumnDefinition, type TableColumnId } from "@fluentui/react-components";
+import { Body2, Button, createTableColumn, DataGrid, DataGridBody, DataGridCell, DataGridHeader, DataGridHeaderCell, DataGridRow, Input, LargeTitle, Link, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Switch, TableCellActions, TableCellLayout, Title1, type TableColumnDefinition, type TableColumnId } from "@fluentui/react-components";
 import { AddRegular, CheckmarkCircleRegular, CircleOffRegular, CloudArrowDownRegular, CloudArrowUpRegular, DeleteRegular, EditRegular, MoreVerticalRegular } from "@fluentui/react-icons";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
@@ -18,8 +18,10 @@ export default function App() {
   const [testUrl, setTestUrl] = useState<string>("");
 
   const testMatchId = useRef<number>(NaN);
+  const testVersion = useRef(0);
 
   const testRules = useCallback(async (newRules: AppRule[], newTestUrl: string, delay: number = 450) => {
+    const version = ++testVersion.current;
     if (!isNaN(testMatchId.current)) {
       window.clearTimeout(testMatchId.current);
     }
@@ -28,11 +30,13 @@ export default function App() {
       return;
     }
     if (!newTestUrl) {
+      testMatchId.current = NaN;
       setRules(newRules.map(rule => ({ ...rule, isMatch: false })));
       return;
     }
     try {
       const matchingRuleIds = await testMatch(newTestUrl);
+      if (version !== testVersion.current) return;
       let enabledIndex = 1;
 
       setRules(newRules.map(rule => {
@@ -48,7 +52,7 @@ export default function App() {
     } catch (error) {
       console.error("Failed to test URL:", error);
     } finally {
-      testMatchId.current = NaN;
+      if (version === testVersion.current) testMatchId.current = NaN;
     }
   }, []);
 
@@ -57,12 +61,40 @@ export default function App() {
     testRules(newRules, testUrl);
   }, [testRules, testUrl]);
 
-  useEffect(() => {
-    async function init() {
-      const loadedRules = await loadRules();
-      handleRulesChanged(loadedRules);
+  const onToggleRule = async (item: AppRule) => {
+    const newRules = rules.map(rule =>
+      rule.id === item.id ? { ...rule, disabled: !rule.disabled } : rule
+    );
+    if (await saveRules(newRules)) {
+      handleRulesChanged(newRules);
+    } else {
+      alert("Failed to update the rule. Please try again.");
     }
+  };
+
+  useEffect(() => {
+    let active = true;
+    let changed = false;
+    async function init() {
+      try {
+        const loadedRules = await loadRules();
+        if (active && !changed) handleRulesChanged(loadedRules);
+      } catch {
+        if (active) alert("Failed to load rules.");
+      }
+    }
+    const onStorageChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area === "sync" && changes.rules) {
+        changed = true;
+        handleRulesChanged(changes.rules.newValue ?? []);
+      }
+    };
+    chrome.storage.onChanged.addListener(onStorageChanged);
     init();
+    return () => {
+      active = false;
+      chrome.storage.onChanged.removeListener(onStorageChanged);
+    };
   }, [handleRulesChanged]);
 
   const onExport = () => {
@@ -158,15 +190,7 @@ export default function App() {
                     <MenuItem icon={<DeleteRegular />} onClick={() => setDeleteRule(item)}>Delete</MenuItem>
                     <MenuItem
                       icon={item.disabled ? <CheckmarkCircleRegular /> : <CircleOffRegular />}
-                      onClick={async () => {
-                        const newRules = rules.slice();
-                        const targetRule = newRules.find(r => r.id === item.id);
-                        if (targetRule) {
-                          targetRule.disabled = !item.disabled;
-                          await saveRules(newRules);
-                          handleRulesChanged(newRules);
-                        }
-                      }}
+                      onClick={() => { void onToggleRule(item); }}
                     >
                       {item.disabled ? "Enable" : "Disable"}
                     </MenuItem>
@@ -175,6 +199,21 @@ export default function App() {
               </Menu>
             </TableCellActions>
           </TableCellLayout>
+        );
+      },
+    }),
+    createTableColumn<AppRule>({
+      columnId: "enabled",
+      renderHeaderCell: () => {
+        return "Enabled";
+      },
+      renderCell: (item) => {
+        return (
+          <Switch
+            aria-label={`${item.disabled ? "Enable" : "Disable"} ${item.name}`}
+            checked={!item.disabled}
+            onChange={() => { void onToggleRule(item); }}
+          />
         );
       },
     }),
