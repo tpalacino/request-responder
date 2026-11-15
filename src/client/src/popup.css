@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  width: 360px;
+  width: 480px;
 }
 
 .popup {
@@ -35,31 +35,37 @@ body {
 }
 
 .rule-name {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   min-width: 0;
   overflow: hidden;
+  padding: 0;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .rule-details {
-  display: none;
+  display: grid;
+  gap: 8px;
   padding: 0 0 12px;
   font-size: 12px;
 }
 
-.rule:hover .rule-details, .rule:focus-within .rule-details {
-  display: grid;
-  gap: 8px;
+.rule-details[hidden] {
+  display: none;
+}
+
+.rule-name:focus-visible {
+  outline: 2px solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
 }
 
 .rule-value {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-}
-
-@media (hover: none) {
-  .rule-details {
-    display: grid;
-    gap: 8px;
-  }
 }

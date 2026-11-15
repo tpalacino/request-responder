@@ -5,20 +5,29 @@ import { loadRules, type Rule } from "./Configuration";
 
 function RuleRow({ rule, saving, onToggle }: { rule: Rule; saving: boolean; onToggle: (id: string, enabled: boolean) => void }) {
   const detailsId = useId();
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <li className="rule">
       <div className="rule-summary">
-        <Text className="rule-name" title={rule.name}>{rule.name}</Text>
+        <button
+          type="button"
+          className="rule-name"
+          title={rule.name}
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          onClick={() => setExpanded(value => !value)}
+        >
+          {rule.name}
+        </button>
         <Switch
           aria-label={rule.name}
-          aria-describedby={detailsId}
           checked={!rule.disabled}
           disabled={saving}
           onChange={(_, data) => onToggle(rule.id, data.checked)}
         />
       </div>
-      <div id={detailsId} className="rule-details">
+      <div id={detailsId} className="rule-details" hidden={!expanded}>
         <div><strong>Match pattern</strong><div className="rule-value">{rule.match}</div></div>
         <div><strong>Replacement</strong><div className="rule-value">{rule.replacement}</div></div>
       </div>
@@ -82,10 +91,8 @@ export function Popup() {
   return (
     <main className="popup">
       <header className="popup-header">
-        <Title3>Request Responder</Title3>
-        <Button appearance="subtle" icon={<SettingsRegular />} aria-label="Open options" onClick={() => { void openOptions(); }}>
-          Options
-        </Button>
+        <Title3>Request Responder Rules</Title3>
+        <Button appearance="subtle" icon={<SettingsRegular />} aria-label="Open options" onClick={() => { void openOptions(); }} />
       </header>
       {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
       {rules === null
