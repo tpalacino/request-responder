@@ -11,7 +11,7 @@ body {
   padding: 16px;
 }
 
-.popup-header, .rule {
+.popup-header, .rule-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -28,6 +28,9 @@ body {
 
 .rule {
   border-top: 1px solid var(--colorNeutralStroke2);
+}
+
+.rule-summary {
   min-height: 48px;
 }
 
@@ -36,4 +39,27 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.rule-details {
+  display: none;
+  padding: 0 0 12px;
+  font-size: 12px;
+}
+
+.rule:hover .rule-details, .rule:focus-within .rule-details {
+  display: grid;
+  gap: 8px;
+}
+
+.rule-value {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+@media (hover: none) {
+  .rule-details {
+    display: grid;
+    gap: 8px;
+  }
 }

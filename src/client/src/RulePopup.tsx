@@ -1,7 +1,30 @@
 import { Button, MessageBar, MessageBarBody, Spinner, Switch, Text, Title3 } from "@fluentui/react-components";
 import { SettingsRegular } from "@fluentui/react-icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { loadRules, type Rule } from "./Configuration";
+
+function RuleRow({ rule, saving, onToggle }: { rule: Rule; saving: boolean; onToggle: (id: string, enabled: boolean) => void }) {
+  const detailsId = useId();
+
+  return (
+    <li className="rule">
+      <div className="rule-summary">
+        <Text className="rule-name" title={rule.name}>{rule.name}</Text>
+        <Switch
+          aria-label={rule.name}
+          aria-describedby={detailsId}
+          checked={!rule.disabled}
+          disabled={saving}
+          onChange={(_, data) => onToggle(rule.id, data.checked)}
+        />
+      </div>
+      <div id={detailsId} className="rule-details">
+        <div><strong>Match pattern</strong><div className="rule-value">{rule.match}</div></div>
+        <div><strong>Replacement</strong><div className="rule-value">{rule.replacement}</div></div>
+      </div>
+    </li>
+  );
+}
 
 export function Popup() {
   const [rules, setRules] = useState<Rule[] | null>(null);
@@ -71,15 +94,7 @@ export function Popup() {
           ? <Text>No rules yet. Open Options to add a rule.</Text>
           : <ul className="rules-list" aria-label="Rules">
             {rules.map(rule => (
-              <li className="rule" key={rule.id}>
-                <Text className="rule-name" title={rule.name}>{rule.name}</Text>
-                <Switch
-                  aria-label={rule.name}
-                  checked={!rule.disabled}
-                  disabled={saving}
-                  onChange={(_, data) => { void toggleRule(rule.id, data.checked); }}
-                />
-              </li>
+              <RuleRow key={rule.id} rule={rule} saving={saving} onToggle={(id, enabled) => { void toggleRule(id, enabled); }} />
             ))}
           </ul>}
     </main>
